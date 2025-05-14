@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Visitor } from './visitor.entity';
@@ -7,7 +7,6 @@ import { VisitorMailService } from './mail/visitormail.service';
 
 @Injectable()
 export class VisitorService {
-  // Removed duplicate implementation of findByNationalId
   constructor(
     @InjectRepository(Visitor)
     private visitorRepository: Repository<Visitor>,
@@ -25,14 +24,14 @@ export class VisitorService {
       }
     }
 
-    // Explicitly preserve durationunit
+    // Explicitly preserve durationunit and boolean fields
     if (visitor.durationunit === '') {
       visitor.durationunit = undefined;
     }
 
-    // Remove undefined/null/empty fields, except durationunit if explicitly set
+    // Remove undefined/null/empty fields, except durationunit and boolean fields
     const cleanedData = Object.entries(visitor).reduce((acc, [key, value]) => {
-      if (value !== undefined && value !== null && (value !== '' || key === 'durationunit')) {
+      if (key === 'durationunit' || ['isApproved', 'inprogress', 'complete', 'exit'].includes(key) || (value !== undefined && value !== null && value !== '')) {
         acc[key] = value;
       }
       return acc;
@@ -83,9 +82,9 @@ export class VisitorService {
       body.durationunit = undefined;
     }
 
-    // Clean the data: remove undefined/null/empty fields, except durationunit if explicitly set
+    // Clean the data: remove undefined/null/empty fields, except durationunit and boolean fields
     const cleanedData = Object.entries(body).reduce((acc, [key, value]) => {
-      if (value !== undefined && value !== null && (value !== '' || key === 'durationunit')) {
+      if (key === 'durationunit' || ['isApproved', 'inprogress', 'complete', 'exit'].includes(key) || (value !== undefined && value !== null && value !== '')) {
         acc[key] = value;
       }
       return acc;
@@ -103,7 +102,6 @@ export class VisitorService {
       console.log(`Updated QR code email sent for visitor ID: ${savedVisitor.id}`);
     } catch (error) {
       console.error('Failed to send updated QR code email:', error);
-      // Log the error but don't throw to avoid blocking the update
     }
 
     return savedVisitor;
@@ -116,11 +114,59 @@ export class VisitorService {
     }
     return { message: `Visitor with id ${id} deleted successfully` };
   }
+
   async findByNationalId(nationalid: string): Promise<Visitor> {
     const visitor = await this.visitorRepository.findOne({ where: { nationalid } });
     if (!visitor) {
       throw new NotFoundException(`Visitor with national ID ${nationalid} not found`);
     }
     return visitor;
+  }
+
+  async updateStatus(id: number, status: string): Promise<Visitor> {
+    const visitor = await this.visitorRepository.findOne({ where: { id } });
+    if (!visitor) {
+      throw new NotFoundException(`Visitor with id ${id} not found`);
+    }
+
+    console.log('Updating status for visitor:', id, 'to:', status);
+
+    // Reset all status fields to false (except isApproved, which will be set based on status)
+    visitor.inprogress = false;
+    visitor.complete = false;
+    visitor.exit = false;
+
+    // Set the relevant status
+    switch (status.toLowerCase()) {
+      case 'approve':
+        visitor.isApproved = true;
+        break;
+      case 'disapprove':
+        visitor.isApproved = false;
+        break;
+      case 'inprogress':
+        visitor.inprogress = true;
+        break;
+      case 'complete':
+        visitor.complete = true;
+        break;
+      case 'exit':
+        visitor.exit = true;
+        break;
+      default:
+        throw new BadRequestException(`Invalid status: ${status}`);
+    }
+
+    const savedVisitor = await this.visitorRepository.save(visitor);
+    console.log('Saved visitor with updated status:', savedVisitor);
+
+    try {
+      await this.visitorMailService.sendVisitorQRCode(savedVisitor);
+      console.log(`Updated QR code email sent for visitor ID: ${savedVisitor.id}`);
+    } catch (error) {
+      console.error('Failed to send updated QR code email:', error);
+    }
+
+    return savedVisitor;
   }
 }

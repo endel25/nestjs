@@ -18,7 +18,7 @@ import { UserRolesModule } from './user-roles/user-roles.module';
       host: 'localhost',
       port: 5432,
       username: 'postgres',
-      password: '123456',
+      password: 'root',
       database: 'CURD',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       autoLoadEntities: true,
