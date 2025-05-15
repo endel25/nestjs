@@ -101,7 +101,7 @@ export class VisitorController {
   @Patch(':id')
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'photoFile', maxCount: 1 },
+      { name: 'photoFile', maxCount:1 },
       { name: 'driverPhotoFile', maxCount: 1 },
     ], {
       storage: diskStorage({

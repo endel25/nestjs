@@ -131,15 +131,11 @@ export class VisitorService {
 
     console.log('Updating status for visitor:', id, 'to:', status);
 
-    // Reset all status fields to false (except isApproved, which will be set based on status)
-    visitor.inprogress = false;
-    visitor.complete = false;
-    visitor.exit = false;
-
-    // Set the relevant status
+    // Update the relevant status field without resetting others
     switch (status.toLowerCase()) {
       case 'approve':
         visitor.isApproved = true;
+        visitor.inprogress = true; // Set inprogress to true when approved
         break;
       case 'disapprove':
         visitor.isApproved = false;
