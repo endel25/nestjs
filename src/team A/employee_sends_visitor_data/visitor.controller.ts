@@ -1,16 +1,4 @@
-import {
-  Controller,
-  Post,
-  Body,
-  UploadedFiles,
-  UseInterceptors,
-  BadRequestException,
-  Get,
-  Param,
-  Patch,
-  Delete,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Post, Body, UploadedFiles, UseInterceptors, BadRequestException, Get, Param, Patch, Delete, NotFoundException } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { VisitorService } from './visitor.service';

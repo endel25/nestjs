@@ -160,13 +160,6 @@ export class VisitorService {
     const savedVisitor = await this.visitorRepository.save(visitor);
     console.log('Saved visitor with updated status:', savedVisitor);
 
-    // try {
-    //   await this.visitorMailService.sendVisitorQRCode(savedVisitor);
-    //   console.log(`Updated QR code email sent for visitor ID: ${savedVisitor.id}`);
-    // } catch (error) {
-    //   console.error('Failed to send updated QR code email:', error);
-    // }
-
     return savedVisitor;
   }
 }
