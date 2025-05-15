@@ -34,4 +34,13 @@ export class User {
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
+
+  @Column({ name: 'employee_no', nullable: true })
+  employeeNo: string;
+
+  @Column({ name: 'department', nullable: true })
+  department: string;
+
+  @Column({ name: 'designation', nullable: true })
+  designation: string;
 }

@@ -15,7 +15,7 @@ export class CreateUserDto {
   userName: string;
 
   @IsString()
-  @IsOptional()  // Changed to optional for update operations
+  @IsOptional()
   password?: string;
 
   @IsString()
@@ -37,4 +37,16 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  employeeNo?: string;
+
+  @IsString()
+  @IsOptional()
+  department?: string;
+
+  @IsString()
+  @IsOptional()
+  designation?: string;
 }
