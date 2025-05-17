@@ -15,6 +15,9 @@ import { PurposeOfVisitController } from './purpose-of-visit/purpose-of-visit.co
 import { Department } from './Department/department.entity';
 import { DepartmentService } from './Department/department.service';
 import { DepartmentController } from './Department/department.controller';
+import { Designation } from './Designation/designation.entity';
+import { DesignationService } from './Designation/designation.service';
+import { DesignationController } from './Designation/designation.controller';
 
 
 @Module({
@@ -25,6 +28,7 @@ import { DepartmentController } from './Department/department.controller';
       VisitorType,
       PurposeOfVisit,
       Department,
+      Designation
     ]),
   ],
   providers: [
@@ -33,6 +37,7 @@ import { DepartmentController } from './Department/department.controller';
     VisitorTypeService,
     PurposeOfVisitService,
     DepartmentService,
+    DesignationService
   ],
   controllers: [
     GenderController,
@@ -40,6 +45,7 @@ import { DepartmentController } from './Department/department.controller';
     VisitorTypeController,
     PurposeOfVisitController,
     DepartmentController,
+    DesignationController
   ],
 })
 export class SettingsModule {}
