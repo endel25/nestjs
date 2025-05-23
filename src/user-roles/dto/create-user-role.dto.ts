@@ -23,7 +23,7 @@ class PermissionDto {
 
   @IsOptional()
   @IsBoolean()
-  SelectAll?: boolean;
+  IsExecute?: boolean;
 }
 
 export class CreateUserRoleDto {

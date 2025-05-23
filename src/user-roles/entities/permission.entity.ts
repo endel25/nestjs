@@ -25,7 +25,7 @@ export class Permission {
   isDeleteDisplay: boolean;
 
   @Column({ default: 1 })
-  selectAllDisplay: boolean;
+  isExecuteDisplay: boolean;
 
   @OneToMany(() => UserRolePermission, permission => permission.permission)
   userRolePermissions: UserRolePermission[];

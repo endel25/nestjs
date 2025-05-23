@@ -26,7 +26,7 @@ export class UserRolePermission {
   isDelete: boolean;
 
   @Column({ default: false })
-  selectAll: boolean;
+  isExecute: boolean;
 
   @ManyToOne(() => UserRole, userRole => userRole.permissions)
   userRole: UserRole;

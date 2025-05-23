@@ -33,9 +33,9 @@ async function bootstrap() {
   // Configure CORS
   app.enableCors({
     origin: [
-      'http://192.168.1.57:8000',
+      'http://192.168.106.137:8000',
       'http://127.0.0.1:3000',
-      'http://192.168.1.57:3000',
+      'http://192.168.106.137:3000',
       'http://127.0.0.1:8000',
       'http://localhost:3000',
       'http://localhost:8000',
@@ -69,8 +69,8 @@ async function bootstrap() {
   const port = 3001;
   const host = '0.0.0.0';
   await app.listen(port, host);
-  logger.log(`Application is running on: http://192.168.1.57:${port}`);
-  logger.log(`Health check available at: http://192.168.1.57:${port}/health`);
+  logger.log(`Application is running on: http://192.168.106.137:${port}`);
+  logger.log(`Health check available at: http://192.168.106.137:${port}/health`);
 }
 
 bootstrap().catch((error) => {

@@ -30,7 +30,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'PreApprovalEntry',
@@ -39,7 +39,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'SpotEntry',
@@ -48,7 +48,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'UserManagement',
@@ -57,7 +57,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'UserRole',
@@ -66,7 +66,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'Dictionarysettings',
@@ -75,7 +75,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'Approvedpasses',
@@ -84,7 +84,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'Disapprovedpasses',
@@ -93,7 +93,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
         {
           permissionName: 'Totalexitpasses',
@@ -102,7 +102,7 @@ export class UserRolesService {
           isCreateDisplay: true,
           isUpdateDisplay: true,
           isDeleteDisplay: true,
-          selectAllDisplay: true,
+          isExecuteDisplay: true,
         },
       ];
 
@@ -120,7 +120,7 @@ export class UserRolesService {
               isCreateDisplay: perm.isCreateDisplay,
               isUpdateDisplay: perm.isUpdateDisplay,
               isDeleteDisplay: perm.isDeleteDisplay,
-              selectAllDisplay: perm.selectAllDisplay,
+              isExecuteDisplay: perm.isExecuteDisplay,
             }
           );
           console.log(`Updated permission: ${perm.permissionName}`);
@@ -141,7 +141,7 @@ export class UserRolesService {
       const where = search ? { userRoleName: Like(`%${search}%`) } : {};
       const [roles, total] = await this.userRoleRepository.findAndCount({
         where,
-        relations: ['permissions', 'permissions.permission'],
+        relations: ["permissions", "permissions.permission"],
         skip,
         take: limit,
       });
@@ -160,7 +160,7 @@ export class UserRolesService {
     try {
       return await this.userRoleRepository.find({
         where: { active: true },
-        relations: ['permissions', 'permissions.permission'],
+        relations: ["permissions", "permissions.permission"],
       });
     } catch (error) {
       throw new BadRequestException(`Failed to fetch active user roles: ${error.message}`);
@@ -171,7 +171,7 @@ export class UserRolesService {
     try {
       const userRole = await this.userRoleRepository.findOne({
         where: { id },
-        relations: ['permissions', 'permissions.permission'],
+        relations: ["permissions", "permissions.permission"],
       });
       if (!userRole) {
         throw new NotFoundException(`User role with ID ${id} not found`);
@@ -200,11 +200,11 @@ export class UserRolesService {
       const permissions = createUserRoleDto.permissions.map(perm => ({
         userRoleId: savedUserRole.id,
         permissionId: perm.id,
-        isRead: perm.SelectAll ? true : perm.IsRead || false,
-        isCreate: perm.SelectAll ? true : perm.IsCreate || false,
-        isUpdate: perm.SelectAll ? true : perm.IsUpdate || false,
-        isDelete: perm.SelectAll ? true : perm.IsDelete || false,
-        selectAll: perm.SelectAll || false,
+        isRead: perm.IsRead || false,
+        isCreate: perm.IsCreate || false,
+        isUpdate: perm.IsUpdate || false,
+        isDelete: perm.IsDelete || false,
+        isExecute: perm.IsExecute || false,
       }));
 
       await this.userRolePermissionRepository.save(permissions);
@@ -233,11 +233,11 @@ export class UserRolesService {
       const permissions = updateUserRoleDto.permissions.map(perm => ({
         userRoleId: id,
         permissionId: perm.id,
-        isRead: perm.SelectAll ? true : perm.IsRead || false,
-        isCreate: perm.SelectAll ? true : perm.IsCreate || false,
-        isUpdate: perm.SelectAll ? true : perm.IsUpdate || false,
-        isDelete: perm.SelectAll ? true : perm.IsDelete || false,
-        selectAll: perm.SelectAll || false,
+        isRead: perm.IsRead || false,
+        isCreate: perm.IsCreate || false,
+        isUpdate: perm.IsUpdate || false,
+        isDelete: perm.IsDelete || false,
+        isExecute: perm.IsExecute || false,
       }));
 
       await this.userRolePermissionRepository.save(permissions);
