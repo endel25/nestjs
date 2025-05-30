@@ -19,7 +19,7 @@ import { SettingsModule } from './Dictionary Setting/settings.module';
       host: 'localhost',
       port: 5432,
       username: 'postgres',
-      password: 'ami@123',
+      password: 'endel@123',
       database: 'CURD',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       autoLoadEntities: true,
