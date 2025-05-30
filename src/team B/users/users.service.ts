@@ -7,9 +7,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, ILike } from 'typeorm';
 import { User } from './user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -103,29 +103,42 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
-  async update(id: number, updateUserDto: CreateUserDto): Promise<User> {
-    this.logger.log(`Updating user id=${id}`);
-    this.logger.log('updateUserDto:', updateUserDto);
-    const user = await this.findOne(id);
+async update(id: number, updateUserDto: CreateUserDto): Promise<User> {
+  this.logger.log(`Updating user id=${id}`);
+  this.logger.log('updateUserDto:', updateUserDto);
+  const user = await this.findOne(id);
 
-    if (updateUserDto.userName && updateUserDto.userName !== user.userName) {
-      const existingUser = await this.usersRepository.findOne({
-        where: { userName: updateUserDto.userName },
-      });
-      if (existingUser && existingUser.id !== id) {
-        throw new ConflictException('Username already exists');
-      }
+  if (updateUserDto.userName && updateUserDto.userName !== user.userName) {
+    const existingUser = await this.usersRepository.findOne({
+      where: { userName: updateUserDto.userName },
+    });
+    if (existingUser && existingUser.id !== id) {
+      throw new ConflictException('Username already exists');
     }
-
-    if (updateUserDto.password) {
-      user.password = await bcrypt.hash(updateUserDto.password, 10);
-    }
-
-    Object.assign(user, updateUserDto);
-    this.logger.log('User entity before saving:', user);
-
-    return this.usersRepository.save(user);
   }
+
+  if (updateUserDto.password) {
+    user.password = await bcrypt.hash(updateUserDto.password, 10);
+  }
+
+  // Explicitly assign fields to avoid overwriting password with null/undefined
+  user.firstName = updateUserDto.firstName;
+  user.lastName = updateUserDto.lastName;
+  user.userName = updateUserDto.userName;
+  user.contactNo = updateUserDto.contactNo ?? '';
+  user.emailId = updateUserDto.emailId ?? '';
+  user.address = updateUserDto.address ?? '';
+  user.userRoleId = updateUserDto.userRoleId ?? '';
+  user.employeeNo = updateUserDto.employeeNo ?? '';
+  user.department = updateUserDto.department ?? '';
+  user.designation = updateUserDto.designation ?? '';
+  user.notes = updateUserDto.notes ?? '';
+
+  this.logger.log('User entity before saving:', user);
+
+  return this.usersRepository.save(user);
+}
+
 
   async delete(id: number): Promise<void> {
     this.logger.log(`Deleting user id=${id}`);
