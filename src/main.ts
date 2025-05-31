@@ -4,33 +4,34 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Configure upload directory
+  // Load SSL certificates (optional)
+  const httpsOptions = {
+    key: readFileSync(join(__dirname, '..', 'ssl', 'key.pem')),
+    cert: readFileSync(join(__dirname, '..', 'ssl', 'cert.pem')),
+  };
+
+  // Create NestExpress app with HTTPS
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    httpsOptions,
+  });
+
+  // Serve uploaded files
   const uploadDir = join(process.cwd(), 'src/uploads');
   if (!existsSync(uploadDir)) {
     mkdirSync(uploadDir, { recursive: true });
   }
+  app.useStaticAssets(uploadDir, { prefix: '/uploads/' });
 
-  // Serve static assets from src/uploads
-  app.useStaticAssets(uploadDir, {
-    prefix: '/uploads/',
-  });
+  // Serve static HTML/CSS/JS from `html-css-js` folder
+  const htmlFolder = join(__dirname, '..', '..', 'html-css-js'); // Go up from dist to root
+  app.useStaticAssets(htmlFolder);
 
-  // Configure assets directory
-  const assetsDir = join(process.cwd(), 'public/assets');
-  if (!existsSync(assetsDir)) {
-    mkdirSync(assetsDir, { recursive: true });
-  }
-  app.useStaticAssets(assetsDir, {
-    prefix: '/assets/',
-  });
-
-  // Configure CORS
+  // CORS config
   app.enableCors({
     origin: [
       'http://192.168.3.73:8000',
@@ -39,13 +40,14 @@ async function bootstrap() {
       'http://127.0.0.1:8000',
       'http://localhost:3000',
       'http://localhost:8000',
+      'https://192.168.3.73:3001',
     ],
     methods: 'GET,POST,PUT,PATCH,DELETE',
     allowedHeaders: 'Content-Type,Authorization',
     credentials: true,
   });
 
-  // Apply global validation pipe
+  // Global validation
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -54,23 +56,23 @@ async function bootstrap() {
     }),
   );
 
-  // Add request logging middleware
+  // Logging middleware
   app.use((req, res, next) => {
     logger.log(`Incoming request: ${req.method} ${req.url}`);
     next();
   });
 
-  // Add a health check endpoint
+  // Health check endpoint
   app.getHttpAdapter().get('/health', (req: any, res: Response) => {
     res.status(200).json({ status: 'UP', timestamp: new Date().toISOString() });
   });
 
-  // Listen on all network interfaces
+  // Start server
   const port = 3001;
   const host = '0.0.0.0';
   await app.listen(port, host);
-  logger.log(`Application is running on: http://192.168.3.73:${port}`);
-  logger.log(`Health check available at: http://192.168.3.73:${port}/health`);
+  logger.log(`✅ HTTPS app running at: https://192.168.3.73:${port}`);
+  logger.log(`✅ Health check at: https://192.168.3.73:${port}/health`);
 }
 
 bootstrap().catch((error) => {
