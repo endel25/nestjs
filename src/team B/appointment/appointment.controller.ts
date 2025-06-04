@@ -403,29 +403,33 @@ async createOrUpdateAppointment(
   }
 
 
- @Patch(':id/status/:status')
-async updateStatus(@Param('id') id: string, @Param('status') status: string): Promise<Appointment> {
-    try {
-      console.log(`📋 Updating status for appointment ID: ${id} to: ${status}`);
-      const updatedAppointment = await this.appointmentService.updateStatus(id, status);
-      console.log('📤 Returning updated appointment:', JSON.stringify(updatedAppointment, null, 2));
-      return {
-        ...updatedAppointment,
-        photo: updatedAppointment.photo && typeof updatedAppointment.photo === 'string' && updatedAppointment.photo.trim() !== ''
-          ? `/uploads/${updatedAppointment.photo.split(/[\\/]/).pop()}`
-          : '',
-        driverphoto: updatedAppointment.driverphoto && typeof updatedAppointment.driverphoto === 'string' && updatedAppointment.driverphoto.trim() !== ''
-          ? `/uploads/${updatedAppointment.driverphoto.split(/[\\/]/).pop()}`
-          : '',
-      };
-    } catch (error) {
-      console.error('❌ Controller error in updateStatus:', error);
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException(`Failed to update status: ${error.message}`);
+@Patch(':id/status/:status')
+async updateStatus(
+  @Param('id') id: string,
+  @Param('status') status: string,
+  @Body() body: { sendEmail?: boolean; complete?: boolean; exit?: boolean }
+): Promise<Appointment>{
+  try {
+    console.log(`📋 Updating status for appointment ID: ${id} to: ${status}, body:`, JSON.stringify(body, null, 2));
+    const updatedAppointment = await this.appointmentService.updateStatus(id, status, { complete: body.complete, exit: body.exit });
+    console.log('📤 Returning updated appointment:', JSON.stringify(updatedAppointment, null, 2));
+    return {
+      ...updatedAppointment,
+      photo: updatedAppointment.photo && typeof updatedAppointment.photo === 'string' && updatedAppointment.photo.trim() !== ''
+        ? `/uploads/${updatedAppointment.photo.split(/[\\/]/).pop()}`
+        : '',
+      driverphoto: updatedAppointment.driverphoto && typeof updatedAppointment.driverphoto === 'string' && updatedAppointment.driverphoto.trim() !== ''
+        ? `/uploads/${updatedAppointment.driverphoto.split(/[\\/]/).pop()}`
+        : '',
+    };
+  } catch (error) {
+    console.error('❌ Controller error in updateStatus:', error);
+    if (error instanceof BadRequestException) {
+      throw error;
     }
+    throw new InternalServerErrorException(`Failed to update status: ${error.message}`);
   }
+}
 
   @Get('check-status')
   async checkFormStatus(

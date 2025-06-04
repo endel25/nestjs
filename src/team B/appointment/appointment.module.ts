@@ -10,6 +10,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { VisitorMailService } from './visitor-mail/visitor-mail.service';
+import { MasterRecordModule } from 'src/MasterRecord/master-record.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { VisitorMailService } from './visitor-mail/visitor-mail.service';
         fileSize: 5 * 1024 * 1024, // 5MB limit
       },
     }),
+    MasterRecordModule
   ],
   controllers: [AppointmentController],
   providers: [AppointmentService, VisitorMailService],

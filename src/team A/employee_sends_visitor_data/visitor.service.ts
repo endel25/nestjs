@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Visitor } from './visitor.entity';
 import { CreateVisitorDto } from './CreateVisitor.dto';
 import { VisitorMailService } from './mail/visitormail.service';
+import { MasterRecordService } from 'src/MasterRecord/master-record.service';
 
 @Injectable()
 export class VisitorService {
@@ -11,7 +12,8 @@ export class VisitorService {
     @InjectRepository(Visitor)
     private visitorRepository: Repository<Visitor>,
     private visitorMailService: VisitorMailService,
-  ) { }
+    private masterRecordService: MasterRecordService,
+  ) {}
 
   async create(visitor: Partial<Visitor>): Promise<Visitor> {
     console.log('Received visitor data:', visitor);
@@ -42,6 +44,16 @@ export class VisitorService {
     const newVisitor = this.visitorRepository.create(cleanedData);
     const savedVisitor = await this.visitorRepository.save(newVisitor);
 
+    // Save to MasterRecord with recordType 'spot'
+    const masterRecordData = {
+      ...cleanedData,
+      isformcompleted: false,
+      ndaApproved: false,
+      SaftyApproval: false,
+      recordType: 'spot' as 'spot' | 'preapproval', // Explicit type
+    };
+    await this.masterRecordService.create(masterRecordData);
+
     try {
       await this.visitorMailService.sendVisitorQRCode(savedVisitor);
     } catch (error) {
@@ -49,18 +61,6 @@ export class VisitorService {
     }
 
     return savedVisitor;
-  }
-
-  async findAll(): Promise<Visitor[]> {
-    return this.visitorRepository.find();
-  }
-
-  async findOne(id: number): Promise<Visitor> {
-    const visitor = await this.visitorRepository.findOne({ where: { id } });
-    if (!visitor) {
-      throw new NotFoundException(`Visitor with id ${id} not found`);
-    }
-    return visitor;
   }
 
   async update(id: number, body: Partial<CreateVisitorDto>): Promise<Visitor> {
@@ -94,9 +94,18 @@ export class VisitorService {
 
     // Merge updated data with existing visitor
     const updated = Object.assign(visitor, cleanedData);
-    const savedVisitor = await this.visitorRepository.save(updated);
+    const savedVisitor = await this.visitorRepository.save(updated); // Fixed typo
 
-    // Send updated QR code email
+    // Save to MasterRecord with recordType 'spot'
+    const masterRecordData = {
+      ...savedVisitor,
+      isformcompleted: false,
+      ndaApproved: false,
+      SaftyApproval: false,
+      recordType: 'spot' as 'spot' | 'preapproval', // Explicit type
+    };
+    await this.masterRecordService.create(masterRecordData);
+
     try {
       await this.visitorMailService.sendVisitorQRCode(savedVisitor);
       console.log(`Updated QR code email sent for visitor ID: ${savedVisitor.id}`);
@@ -105,22 +114,6 @@ export class VisitorService {
     }
 
     return savedVisitor;
-  }
-
-  async remove(id: number): Promise<{ message: string }> {
-    const result = await this.visitorRepository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Visitor with id ${id} not found`);
-    }
-    return { message: `Visitor with id ${id} deleted successfully` };
-  }
-
-  async findByNationalId(nationalid: string): Promise<Visitor> {
-    const visitor = await this.visitorRepository.findOne({ where: { nationalid } });
-    if (!visitor) {
-      throw new NotFoundException(`Visitor with national ID ${nationalid} not found`);
-    }
-    return visitor;
   }
 
   async updateStatus(id: number, status: string): Promise<Visitor> {
@@ -156,6 +149,45 @@ export class VisitorService {
     const savedVisitor = await this.visitorRepository.save(visitor);
     console.log('Saved visitor with updated status:', savedVisitor);
 
+    // Save to MasterRecord with recordType 'spot'
+    const masterRecordData = {
+      ...savedVisitor,
+      isformcompleted: false,
+      ndaApproved: false,
+      SaftyApproval: false,
+      recordType: 'spot' as 'spot' | 'preapproval', // Explicit type
+    };
+    await this.masterRecordService.create(masterRecordData);
+
     return savedVisitor;
+  }
+
+  // Added missing methods
+  async findAll(): Promise<Visitor[]> {
+    return await this.visitorRepository.find();
+  }
+
+  async findOne(id: number): Promise<Visitor> {
+    const visitor = await this.visitorRepository.findOne({ where: { id } });
+    if (!visitor) {
+      throw new NotFoundException(`Visitor with id ${id} not found`);
+    }
+    return visitor;
+  }
+
+  async remove(id: number): Promise<void> {
+    const visitor = await this.visitorRepository.findOne({ where: { id } });
+    if (!visitor) {
+      throw new NotFoundException(`Visitor with id ${id} not found`);
+    }
+    await this.visitorRepository.remove(visitor);
+  }
+
+  async findByNationalId(nationalid: string): Promise<Visitor> {
+    const visitor = await this.visitorRepository.findOne({ where: { nationalid } });
+    if (!visitor) {
+      throw new NotFoundException(`Visitor with national ID ${nationalid} not found`);
+    }
+    return visitor;
   }
 }

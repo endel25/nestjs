@@ -11,6 +11,7 @@ import { MailService } from './team B/mail/mail.service';
 import { UsersModule } from './team B/users/users.module';
 import { UserRolesModule } from './user-roles/user-roles.module';
 import { SettingsModule } from './Dictionary Setting/settings.module';
+import { MasterRecordModule } from './MasterRecord/master-record.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { SettingsModule } from './Dictionary Setting/settings.module';
     UsersModule,
     UserRolesModule,
     SettingsModule,
+    MasterRecordModule
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

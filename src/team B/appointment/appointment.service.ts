@@ -4,7 +4,8 @@ import { Repository } from 'typeorm';
 import { Appointment } from './appointment.entity';
 import { MailService } from '../mail/mail.service';
 import { VisitorMailService } from './visitor-mail/visitor-mail.service';
-import { pagination } from '../appointment/appointment_dto/pagination.dto';
+import { pagination } from './appointment_dto/pagination.dto';
+import { MasterRecordService } from 'src/MasterRecord/master-record.service';
 
 @Injectable()
 export class AppointmentService {
@@ -13,7 +14,8 @@ export class AppointmentService {
     private readonly appointmentRepo: Repository<Appointment>,
     private readonly mailService: MailService,
     private readonly visitorMailService: VisitorMailService,
-  ) { }
+    private readonly masterRecordService: MasterRecordService,
+  ) {}
 
   async createOrUpdateAppointment(data: Partial<Appointment>): Promise<Appointment> {
     try {
@@ -23,7 +25,6 @@ export class AppointmentService {
         throw new BadRequestException('Missing required fields: email, date, time');
       }
 
-      // Additional safeguard: ensure personname and department are strings
       if (Array.isArray(data.personname)) {
         console.warn('⚠️ personname is an array in service:', data.personname);
         data.personname = data.personname.length > 0 ? data.personname[0] : '';
@@ -68,7 +69,6 @@ export class AppointmentService {
           isformcompleted: true,
         });
         console.log(`✅ Updated appointment for ${savedAppointment.email}, durationunit: ${savedAppointment.durationunit}`);
-        await this.visitorMailService.sendVisitorQRCode(savedAppointment);
       } else {
         const appointment = this.appointmentRepo.create({
           firstname: data.firstname || '',
@@ -120,6 +120,14 @@ export class AppointmentService {
         }
       }
 
+      // Save to MasterRecord with recordType 'preapproval'
+      const masterRecordData = {
+        ...savedAppointment,
+        recordType: 'preapproval' as 'spot' | 'preapproval', // Explicit type
+      };
+      await this.masterRecordService.create(masterRecordData);
+
+      await this.visitorMailService.sendVisitorQRCode(savedAppointment);
       return savedAppointment;
     } catch (error) {
       console.error('❌ Error creating/updating appointment:', error);
@@ -168,6 +176,13 @@ export class AppointmentService {
         isformcompleted: data.isformcompleted ?? appointment.isformcompleted,
       });
 
+      // Save to MasterRecord with recordType 'preapproval'
+      const masterRecordData = {
+        ...updatedAppointment,
+        recordType: 'preapproval' as 'spot' | 'preapproval', // Explicit type
+      };
+      await this.masterRecordService.create(masterRecordData);
+
       await queryRunner.commitTransaction();
       console.log('✅ Transaction committed, updated appointment, durationunit:', updatedAppointment.durationunit, JSON.stringify(updatedAppointment, null, 2));
       await this.visitorMailService.sendVisitorQRCode(updatedAppointment);
@@ -184,49 +199,199 @@ export class AppointmentService {
     }
   }
 
-  async checkFormStatus(email: string, date: string, time: string): Promise<boolean> {
+  async updateNdaStatus(email: string, date: string, time: string, ndaApproved: boolean): Promise<Appointment> {
+    const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      const appointment = await this.appointmentRepo.findOne({
+      const appointment = await queryRunner.manager.findOne(Appointment, {
         where: { email, date, time },
       });
-      console.log(`📋 Form status for ${email}, durationunit: ${appointment?.durationunit}`);
-      return appointment?.isformcompleted || false;
-    } catch (error) {
-      console.error('❌ Error checking form status:', error);
-      throw new InternalServerErrorException('Failed to check form status: ' + error.message);
-    }
-  }
-
-  async checkEmailExists(email: string): Promise<boolean> {
-    try {
-      const existingEmail = await this.appointmentRepo.findOne({
-        where: { email },
-      });
-      console.log(`📋 Email exists check for ${email}: ${!!existingEmail}`);
-      return !!existingEmail;
-    } catch (error) {
-      console.error('❌ Error checking email:', error);
-      throw new InternalServerErrorException('Failed to check email existence: ' + error.message);
-    }
-  }
-
-  async getAppointmentByContactNumber(contactnumber: string): Promise<Appointment> {
-    try {
-      const appointment = await this.appointmentRepo.findOne({
-        where: { contactnumber },
-        order: { id: 'DESC' },
-      });
       if (!appointment) {
-        throw new BadRequestException(`Appointment with contactnumber ${contactnumber} not found.`);
+        throw new BadRequestException(`Appointment with email ${email}, date ${date}, time ${time} not found.`);
       }
-      console.log(`📋 Retrieved appointment for contactnumber ${contactnumber}, durationunit: ${appointment.durationunit}`);
-      return appointment;
+
+      const updatedAppointment = await queryRunner.manager.save(Appointment, {
+        ...appointment,
+        ndaApproved: ndaApproved,
+      });
+
+      // Save to MasterRecord with recordType 'preapproval'
+      const masterRecordData = {
+        ...updatedAppointment,
+        recordType: 'preapproval' as 'spot' | 'preapproval', // Explicit type
+      };
+      await this.masterRecordService.create(masterRecordData);
+
+      await queryRunner.commitTransaction();
+      console.log('✅ Transaction committed, updated NDA status, ndaApproved:', updatedAppointment.ndaApproved, JSON.stringify(updatedAppointment, null, 2));
+      return updatedAppointment;
     } catch (error) {
-      console.error('❌ Error in getAppointmentByContactNumber:', error);
+      await queryRunner.rollbackTransaction();
+      console.error('❌ Error updating NDA status, transaction rolled back:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException('Failed to retrieve appointment: ' + error.message);
+      throw new InternalServerErrorException('Failed to update NDA status: ' + error.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async updateSafetyStatus(email: string, date: string, time: string, SaftyApproval: boolean): Promise<Appointment> {
+    const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const appointment = await queryRunner.manager.findOne(Appointment, {
+        where: { email, date, time },
+      });
+      if (!appointment) {
+        throw new BadRequestException(`Appointment with email ${email}, date ${date}, time ${time} not found.`);
+      }
+
+      const updatedAppointment = await queryRunner.manager.save(Appointment, {
+        ...appointment,
+        SaftyApproval: SaftyApproval,
+      });
+
+      // Save to MasterRecord with recordType 'preapproval'
+      const masterRecordData = {
+        ...updatedAppointment,
+        recordType: 'preapproval' as 'spot' | 'preapproval', // Explicit type
+      };
+      await this.masterRecordService.create(masterRecordData);
+
+      await queryRunner.commitTransaction();
+      console.log('✅ Transaction committed, updated safety acknowledgment status, SaftyApproval:', updatedAppointment.SaftyApproval, JSON.stringify(updatedAppointment, null, 2));
+      return updatedAppointment;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error('❌ Error updating safety acknowledgment status, transaction rolled back:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to update safety acknowledgment status: ' + error.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async updateGatepassStatus(id: string): Promise<Appointment> {
+    const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const appointment = await queryRunner.manager.findOne(Appointment, { where: { id: Number(id) } });
+      if (!appointment) {
+        throw new BadRequestException(`Appointment with ID ${id} not found.`);
+      }
+
+      const updatedAppointment = await queryRunner.manager.save(Appointment, {
+        ...appointment,
+        // Add specific gatepass logic if needed; assuming no status change for simplicity
+      });
+
+      // Save to MasterRecord with recordType 'preapproval'
+      const masterRecordData = {
+        ...updatedAppointment,
+        recordType: 'preapproval' as 'spot' | 'preapproval', // Explicit type
+      };
+      await this.masterRecordService.create(masterRecordData);
+
+      await queryRunner.commitTransaction();
+      console.log('✅ Transaction committed, updated gatepass status, durationunit:', updatedAppointment.durationunit, JSON.stringify(updatedAppointment, null, 2));
+      return updatedAppointment;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error('❌ Error updating gatepass status, transaction rolled back:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to update gatepass status: ' + error.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async updateStatus(id: string, status: string, resetStatus?: { complete?: boolean; exit?: boolean }): Promise<Appointment> {
+    const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const appointment = await queryRunner.manager.findOne(Appointment, { where: { id: Number(id) } });
+      if (!appointment) {
+        throw new BadRequestException(`Appointment with ID ${id} not found`);
+      }
+
+      console.log('Updating status for appointment:', id, 'to:', status, 'resetStatus:', resetStatus);
+
+      switch (status.toLowerCase()) {
+        case 'approve':
+          appointment.isApproved = true;
+          appointment.inprogress = true;
+          if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
+          if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
+          break;
+        case 'disapprove':
+          appointment.isApproved = false;
+          if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
+          if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
+          break;
+        case 'inprogress':
+          appointment.inprogress = true;
+          if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
+          if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
+          break;
+        case 'complete':
+          appointment.complete = resetStatus?.complete ?? true;
+          if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
+          break;
+        case 'exit':
+          appointment.exit = resetStatus?.exit ?? true;
+          if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
+          break;
+        default:
+          throw new BadRequestException(`Invalid status: ${status}`);
+      }
+
+      const savedAppointment = await queryRunner.manager.save(Appointment, appointment);
+
+      // Save to MasterRecord with recordType 'preapproval'
+      const masterRecordData = {
+        ...savedAppointment,
+        recordType: 'preapproval' as 'spot' | 'preapproval', // Explicit type
+      };
+      await this.masterRecordService.create(masterRecordData);
+
+      await queryRunner.commitTransaction();
+      console.log('✅ Transaction committed, updated status:', savedAppointment);
+      return savedAppointment;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error('❌ Error updating status, transaction rolled back:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(`Failed to update status: ${error.message}`);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // Added missing methods
+  async getAppointmentsByEmail(email: string): Promise<Appointment[]> {
+    try {
+      const appointments = await this.appointmentRepo.find({ where: { email } });
+      console.log(`📋 Retrieved ${appointments.length} appointments for ${email}, durationunit sample: ${appointments[0]?.durationunit}`);
+      return appointments;
+    } catch (error) {
+      console.error('❌ Error in getAppointmentsByEmail:', error);
+      throw new InternalServerErrorException('Failed to retrieve appointments by email: ' + error.message);
     }
   }
 
@@ -253,14 +418,23 @@ export class AppointmentService {
     }
   }
 
-  async getAppointmentsByEmail(email: string): Promise<Appointment[]> {
+  async getAppointmentByContactNumber(contactnumber: string): Promise<Appointment> {
     try {
-      const appointments = await this.appointmentRepo.find({ where: { email } });
-      console.log(`📋 Retrieved ${appointments.length} appointments for ${email}, durationunit sample: ${appointments[0]?.durationunit}`);
-      return appointments;
+      const appointment = await this.appointmentRepo.findOne({
+        where: { contactnumber },
+        order: { id: 'DESC' },
+      });
+      if (!appointment) {
+        throw new BadRequestException(`Appointment with contactnumber ${contactnumber} not found.`);
+      }
+      console.log(`📋 Retrieved appointment for contactnumber ${contactnumber}, durationunit: ${appointment.durationunit}`);
+      return appointment;
     } catch (error) {
-      console.error('❌ Error in getAppointmentsByEmail:', error);
-      throw new InternalServerErrorException('Failed to retrieve appointments by email: ' + error.message);
+      console.error('❌ Error in getAppointmentByContactNumber:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to retrieve appointment: ' + error.message);
     }
   }
 
@@ -281,154 +455,16 @@ export class AppointmentService {
     }
   }
 
-  async updateGatepassStatus(id: string): Promise<Appointment> {
-    const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
+  async checkFormStatus(email: string, date: string, time: string): Promise<boolean> {
     try {
-      const appointment = await queryRunner.manager.findOne(Appointment, { where: { id: Number(id) } });
-      if (!appointment) {
-        throw new BadRequestException(`Appointment with ID ${id} not found.`);
-      }
-
-      const updatedAppointment = await queryRunner.manager.save(Appointment, {
-        ...appointment,
-        
-      });
-
-      await queryRunner.commitTransaction();
-      console.log('✅ Transaction committed, updated gatepass status, durationunit:', updatedAppointment.durationunit, JSON.stringify(updatedAppointment, null, 2));
-      return updatedAppointment;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      console.error('❌ Error updating gatepass status, transaction rolled back:', error);
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Failed to update gatepass status: ' + error.message);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async updateNdaStatus(email: string, date: string, time: string, ndaApproved: boolean): Promise<Appointment> {
-    const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const appointment = await queryRunner.manager.findOne(Appointment, {
+      const appointment = await this.appointmentRepo.findOne({
         where: { email, date, time },
       });
-      if (!appointment) {
-        throw new BadRequestException(`Appointment with email ${email}, date ${date}, time ${time} not found.`);
-      }
-
-      const updatedAppointment = await queryRunner.manager.save(Appointment, {
-        ...appointment,
-        ndaApproved: ndaApproved,
-      });
-
-      await queryRunner.commitTransaction();
-      console.log('✅ Transaction committed, updated NDA status, ndaApproved:', updatedAppointment.ndaApproved, JSON.stringify(updatedAppointment, null, 2));
-      return updatedAppointment;
+      console.log(`📋 Form status for ${email}, durationunit: ${appointment?.durationunit}`);
+      return appointment?.isformcompleted || false;
     } catch (error) {
-      await queryRunner.rollbackTransaction();
-      console.error('❌ Error updating NDA status, transaction rolled back:', error);
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Failed to update NDA status: ' + error.message);
-    } finally {
-      await queryRunner.release();
+      console.error('❌ Error checking form status:', error);
+      throw new InternalServerErrorException('Failed to check form status: ' + error.message);
     }
   }
-
-
-
-
-  async updateSafetyStatus(email: string, date: string, time: string, SaftyApproval: boolean): Promise<Appointment> {
-    const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const appointment = await queryRunner.manager.findOne(Appointment, {
-        where: { email, date, time },
-      });
-      if (!appointment) {
-        throw new BadRequestException(`Appointment with email ${email}, date ${date}, time ${time} not found.`);
-      }
-
-      const updatedAppointment = await queryRunner.manager.save(Appointment, {
-        ...appointment,
-        SaftyApproval: SaftyApproval,
-      });
-
-      await queryRunner.commitTransaction();
-      console.log('✅ Transaction committed, updated safety acknowledgment status, SaftyApproval:', updatedAppointment.SaftyApproval, JSON.stringify(updatedAppointment, null, 2));
-      return updatedAppointment;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      console.error('❌ Error updating safety acknowledgment status, transaction rolled back:', error);
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Failed to update safety acknowledgment status: ' + error.message);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async updateStatus(id: string, status: string): Promise<Appointment> {
-  const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
-  await queryRunner.connect();
-  await queryRunner.startTransaction();
-
-  try {
-    const appointment = await queryRunner.manager.findOne(Appointment, { where: { id: Number(id) } });
-    if (!appointment) {
-      throw new BadRequestException(`Appointment with ID ${id} not found`);
-    }
-
-    console.log('Updating status for appointment:', id, 'to:', status);
-
-    switch (status.toLowerCase()) {
-      case 'approve':
-        appointment.isApproved = true;
-        appointment.inprogress = true; // Set inprogress to true when approved
-        break;
-      case 'disapprove':
-        appointment.isApproved = false;
-        break;
-      case 'inprogress':
-        appointment.inprogress = true;
-        break;
-      case 'complete':
-        appointment.complete = true;
-        break;
-      case 'exit':
-        appointment.exit = true;
-        break;
-      default:
-        throw new BadRequestException(`Invalid status: ${status}`);
-    }
-
-    const savedAppointment = await queryRunner.manager.save(Appointment, appointment);
-    await queryRunner.commitTransaction();
-    console.log('✅ Transaction committed, updated status:', savedAppointment);
-
-    return savedAppointment;
-  } catch (error) {
-    await queryRunner.rollbackTransaction();
-    console.error('❌ Error updating status, transaction rolled back:', error);
-    if (error instanceof BadRequestException) {
-      throw error;
-    }
-    throw new InternalServerErrorException(`Failed to update status: ${error.message}`);
-  } finally {
-    await queryRunner.release();
-  }
-}
 }
