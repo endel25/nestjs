@@ -37,6 +37,7 @@
     "class-validator": "^0.14.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^5.1.0",
     "fs": "^0.0.1-security",
     "fs-extra": "^11.3.0",
     "https": "^1.0.0",
