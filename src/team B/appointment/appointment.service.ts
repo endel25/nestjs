@@ -109,7 +109,7 @@ export class AppointmentService {
             gender: savedAppointment.gender || '',
             contactnumber: savedAppointment.contactnumber || '',
           });
-          const formLink = `http://192.168.3.75:8000/visitorverify.html?${params.toString()}`;
+          const formLink = `https://192.168.3.75:3001/visitorverify.html?${params.toString()}`;
           await this.mailService.sendAppointmentEmail(
             savedAppointment.email,
             savedAppointment.date,
@@ -381,7 +381,7 @@ export class AppointmentService {
     }
   }
 
-  async updateStatus(id: string, status: string): Promise<Appointment> {
+ async updateStatus(id: string, status: string, resetStatus?: { complete?: boolean; exit?: boolean }): Promise<Appointment> {
   const queryRunner = this.appointmentRepo.manager.connection.createQueryRunner();
   await queryRunner.connect();
   await queryRunner.startTransaction();
@@ -392,24 +392,32 @@ export class AppointmentService {
       throw new BadRequestException(`Appointment with ID ${id} not found`);
     }
 
-    console.log('Updating status for appointment:', id, 'to:', status);
+    console.log('Updating status for appointment:', id, 'to:', status, 'resetStatus:', resetStatus);
 
     switch (status.toLowerCase()) {
       case 'approve':
         appointment.isApproved = true;
         appointment.inprogress = true; // Set inprogress to true when approved
+        if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
+        if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
         break;
       case 'disapprove':
         appointment.isApproved = false;
+        if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
+        if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
         break;
       case 'inprogress':
         appointment.inprogress = true;
+        if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
+        if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
         break;
       case 'complete':
-        appointment.complete = true;
+        appointment.complete = resetStatus?.complete ?? true; // Use provided value or default to true
+        if (resetStatus?.exit !== undefined) appointment.exit = resetStatus.exit;
         break;
       case 'exit':
-        appointment.exit = true;
+        appointment.exit = resetStatus?.exit ?? true; // Use provided value or default to true
+        if (resetStatus?.complete !== undefined) appointment.complete = resetStatus.complete;
         break;
       default:
         throw new BadRequestException(`Invalid status: ${status}`);
